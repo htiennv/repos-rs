@@ -1,31 +1,31 @@
-use crate::{endpoint::ReplicaConnection, options::CallOptions};
+use crate::{endpoint::Endpoint, options::CallOptions};
 
 // Balancer manages a set of ReplicaConnections and picks one of them per
 // call. It requires external synchronization (no concurrent calls).
 pub trait Balancer {
     // Add adds a ReplicaConnection to the set of connections.
-    fn add(&mut self, conn: Box<dyn ReplicaConnection + Sync + Send + 'static>);
+    fn add(&mut self, conn: Box<dyn Endpoint>);
 
     // Remove removes a ReplicaConnection from the set of connections.
-    fn remove(&mut self, conn: &dyn ReplicaConnection);
+    fn remove(&mut self, conn: &dyn Endpoint);
 
     // Pick picks a ReplicaConnection from the set of connections based on
     // provided CallOptions. Returns None if no connections are available.
-    fn pick(&mut self, options: &CallOptions) -> Option<Box<dyn ReplicaConnection>>;
+    fn pick(&mut self, options: &CallOptions) -> Option<Box<dyn Endpoint>>;
 }
 
 // RoundRobin implements Balancer with a round-robin picking strategy.
 struct RoundRobin {
-    connections: Vec<Box<dyn ReplicaConnection>>,
+    connections: Vec<Box<dyn Endpoint>>,
     next: usize,
 }
 
 impl Balancer for RoundRobin {
-    fn add(&mut self, conn: Box<dyn ReplicaConnection + Sync + Send + 'static>) {
+    fn add(&mut self, conn: Box<dyn Endpoint>) {
         self.connections.push(conn)
     }
 
-    fn remove(&mut self, conn: &dyn ReplicaConnection) {
+    fn remove(&mut self, conn: &dyn Endpoint) {
         let index_to_remove = self
             .connections
             .iter()
@@ -35,7 +35,7 @@ impl Balancer for RoundRobin {
         }
     }
 
-    fn pick(&mut self, _options: &CallOptions) -> Option<Box<dyn ReplicaConnection>> {
+    fn pick(&mut self, _options: &CallOptions) -> Option<Box<dyn Endpoint>> {
         if self.connections.len() == 0 {
             return None;
         }
@@ -59,7 +59,7 @@ pub fn round_robin() -> Box<dyn Balancer> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        endpoint::{NetEndpoint, ReplicaConnection},
+        endpoint::{Endpoint, NetEndpoint},
         options::CallOptions,
     };
 
